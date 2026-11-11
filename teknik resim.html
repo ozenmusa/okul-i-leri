@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Teknik Resim Atölyesi</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#eef2f7;color:#172033;font-family:Arial,sans-serif}
+header{background:#17365d;color:white;padding:18px;text-align:center}
+header h1{margin:0 0 6px;font-size:25px}
+header p{margin:0;color:#dbeafe}
+nav{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;padding:12px}
+button,select{border:0;border-radius:8px;padding:10px 14px;font-weight:bold;cursor:pointer}
+button{background:#2563eb;color:white}
+button:hover{background:#1749ad}
+button.secondary{background:#64748b}
+button.active{background:#0f766e}
+main{max-width:1250px;margin:auto;padding:12px}
+.panel{background:white;border-radius:12px;padding:15px;margin-bottom:14px;box-shadow:0 2px 9px #0001}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.toolbar label{font-weight:bold}
+#modelTitle{font-size:20px;font-weight:bold}
+.viewer{height:430px;width:100%;background:#e7edf5;border-radius:10px;overflow:hidden;touch-action:none}
+.viewer.small{height:300px}
+.viewer canvas{display:block;width:100%!important;height:100%!important}
+.layout{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.views{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.viewcard{background:#f8fafc;border:1px solid #dbe3ee;border-radius:10px;padding:10px;text-align:center}
+.viewcard canvas{width:100%;height:145px;display:block;background:white;border:1px solid #dbe3ee}
+.viewcard strong{display:block;margin-bottom:6px}
+#builder,#quiz{display:none}
+#builderGrid{display:grid;grid-template-columns:repeat(6,1fr);gap:4px;max-width:360px}
+.cell{aspect-ratio:1;border:1px solid #cbd5e1;background:#f1f5f9;border-radius:4px;cursor:pointer}
+.cell:hover{outline:2px solid #2563eb}
+.palette{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+.swatch{width:30px;height:30px;border:2px solid #64748b;border-radius:50%;cursor:pointer}
+.swatch.selected{outline:3px solid #111;outline-offset:2px}
+.quizrow{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.option{border:2px solid #cbd5e1;background:white;color:#172033;padding:8px;border-radius:9px;text-align:center}
+.option.selected{border:3px solid #2563eb;background:#eff6ff}
+.option canvas{width:100%;height:130px;display:block;background:#f8fafc;margin-bottom:6px}
+.feedback{font-weight:bold;margin-top:12px}
+.small{font-size:13px;color:#64748b}
+@media(max-width:700px){
+ .layout{grid-template-columns:1fr}
+ .views{grid-template-columns:1fr}
+ .viewer{height:340px}
+ .quizrow{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<header>
+<h1>TEKNİK RESİM ATÖLYESİ</h1>
+<p>3B Katı Modelleme • Görünüşler • Tasarım Etkinliği</p>
+</header>
+
+<nav>
+<button id="tabModels" class="active" onclick="showTab('models')">Model Atölyesi</button>
+<button id="tabBuilder" onclick="showTab('builder')">Kendi Modelimi Oluştur</button>
+<button id="tabQuiz" onclick="showTab('quiz')">Görünüş Tahmin Et</button>
+</nav>
+
+<main>
+<section id="models">
+<div class="panel">
+<div class="toolbar">
+<label>Model seviyesi:</label>
+<select id="level" onchange="filterModels()">
+<option value="all">Tüm seviyeler</option>
+<option value="Başlangıç">Başlangıç</option>
+<option value="Kolay">Kolay</option>
+<option value="Orta">Orta</option>
+</select>
+<label>Model:</label>
+<select id="modelSelect" onchange="selectModel(+this.value)"></select>
+</div>
+</div>
+
+<div class="panel">
+<div class="toolbar" style="justify-content:space-between">
+<div>
+<div id="modelTitle">Model</div>
+<div id="modelInfo" class="small"></div>
+</div>
+</div>
+<div id="viewer" class="viewer" style="margin-top:10px;"></div>
+<div class="toolbar" style="margin-top:10px">
+<button onclick="setCameraView('iso')">İzometrik Görünüş</button>
+<button class="secondary" onclick="setCameraView('front')">Ön Görünüş</button>
+<button class="secondary" onclick="setCameraView('top')">Üst Görünüş</button>
+<button class="secondary" onclick="setCameraView('side')">Yan Görünüş</button>
+<button onclick="nextModel()" style="margin-left:auto">Sonraki Model →</button>
+</div>
+</div>
+
+<div class="panel">
+<h3>Teknik Resim Görünüşleri</h3>
+<p class="small">Seçilen modelin ön, üst ve yan görünüşleri.</p>
+<div class="views">
+<div class="viewcard"><strong>ÖN GÖRÜNÜŞ</strong><canvas id="frontCanvas" width="300" height="180"></canvas></div>
+<div class="viewcard"><strong>ÜST GÖRÜNÜŞ</strong><canvas id="topCanvas" width="300" height="180"></canvas></div>
+<div class="viewcard"><strong>YAN GÖRÜNÜŞ</strong><canvas id="sideCanvas" width="300" height="180"></canvas></div>
+</div>
+</div>
+</section>
+
+<section id="builder">
+<div class="panel">
+<h2>Kendi Katı Modelini Oluştur</h2>
+<p>Katman seç. Renk paletinden renk seçerek ızgaraya tıkla ve kendi modelini tasarla.</p>
+<div class="toolbar">
+<label>Katman:</label>
+<select id="layerSelect" onchange="drawGrid()">
+<option value="0">1. Katman</option>
+<option value="1">2. Katman</option>
+<option value="2">3. Katman</option>
+<option value="3">4. Katman</option>
+</select>
+<label>İşlem:</label>
+<button id="addMode" class="active" onclick="setEditMode('add')">Blok Ekle</button>
+<button id="removeMode" class="secondary" onclick="setEditMode('remove')">Blok Sil</button>
+</div>
+<div class="palette" id="palette"></div>
+<div class="layout">
+<div>
+<h3>Blok Izgarası</h3>
+<div id="builderGrid"></div>
+<div class="toolbar" style="margin-top:12px">
+<button onclick="clearLayer()">Katmanı Temizle</button>
+<button class="secondary" onclick="clearAll()">Tümünü Temizle</button>
+</div>
+</div>
+<div>
+<h3>Oluşturduğun Model</h3>
+<div id="builderViewer" class="viewer small"></div>
+<div class="toolbar" style="margin-top:10px">
+<button onclick="showCustomViews()">Görünüşleri Oluştur</button>
+<button onclick="useCustomModel()">Tahmin Etkinliğine Gönder</button>
+</div>
+<p class="small">Modeli fareyle sürükleyerek döndürebilirsin.</p>
+</div>
+</div>
+</div>
+</section>
+
+<section id="quiz">
+<div class="panel">
+<h2>Görünüş Tahmin Etkinliği</h2>
+<p>3B modeli incele. Aşağıdaki seçeneklerden doğru ön, üst ve yan görünüşleri seç.</p>
+<div id="quizViewer" class="viewer small" style="margin-top:10px;"></div>
+<div class="toolbar" style="margin:10px 0">
+<button onclick="newQuiz()">Yeni Soru</button>
+</div>
+<div id="quizQuestions"></div>
+<button onclick="checkQuiz()" style="margin-top:15px">Cevaplarımı Kontrol Et</button>
+<div id="quizFeedback" class="feedback"></div>
+</div>
+</section>
+</main>
+
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+
+const defaultGray = '#94a3b8';
+const builderColors = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#64748b', '#334155'];
+let selectedColor = builderColors[0];
+let editMode = 'add';
+let current = 0;
+let models = [];
+let layers = Array.from({length:4}, () => Array(36).fill(null));
+let quizTarget = null;
+
+let renderer, scene, camera, group;
+let customRenderer, customScene, customCamera, customGroup;
+let quizRenderer, quizScene, quizCamera, quizGroup;
+
+function addBox(arr, x, y, z, w=1, h=1, d=1){
+  for(let i=x; i<x+w; i++)
+    for(let j=y; j<y+h; j++)
+      for(let k=z; k<z+d; k++)
+        arr.push({x:i, y:j, z:k, color: defaultGray});
+}
+
+function makeModels(){
+  let a = [];
+  let p = arr => a.push(arr);
+  let b = () => [];
+  
+  let q = b(); addBox(q,0,0,0,2,2,2); p(q); 
+  q = b(); addBox(q,0,0,0,4,2,2); p(q); 
+  q = b(); addBox(q,0,0,0,3,3,1); p(q); 
+  q = b(); addBox(q,0,0,0,2,2,4); p(q); 
+  q = b(); addBox(q,0,0,0,4,1,2); p(q); 
+  q = b(); addBox(q,0,0,0,3,2,3); p(q); 
+  q = b(); addBox(q,0,0,0,1,1,4); p(q); 
+
+  q = b(); addBox(q,0,0,0,4,2,1); addBox(q,0,0,1,2,2,1); p(q); 
+  q = b(); addBox(q,0,0,0,1,4,2); addBox(q,1,0,0,3,1,2); p(q); 
+  q = b(); addBox(q,0,0,0,4,1,2); addBox(q,1,1,0,2,3,2); p(q); 
+  q = b(); addBox(q,0,0,0,1,4,2); addBox(q,3,0,0,1,4,2); addBox(q,1,0,0,2,1,2); p(q); 
+  q = b(); addBox(q,0,0,0,4,4,1); addBox(q,0,0,1,1,4,1); addBox(q,3,0,1,1,4,1); p(q); 
+  q = b(); addBox(q,0,0,0,4,4,2); addBox(q,1,1,2,2,2,1); p(q); 
+  q = b(); addBox(q,0,0,0,4,2,2); addBox(q,1,0,2,2,2,1); addBox(q,1,0,3,2,2,1); p(q); 
+
+  q = b(); addBox(q,0,0,0,4,4,1); addBox(q,0,0,1,2,2,2); addBox(q,2,2,1,2,2,2); p(q); 
+  q = b(); addBox(q,0,0,0,4,2,1); addBox(q,0,0,1,2,2,2); addBox(q,2,0,1,2,2,1); p(q); 
+  q = b(); addBox(q,0,0,0,4,3,1); addBox(q,0,0,1,1,3,2); addBox(q,3,0,1,1,3,2); addBox(q,1,1,1,2,1,2); p(q); 
+  q = b(); addBox(q,0,0,0,4,4,1); addBox(q,1,1,1,2,2,2); p(q); 
+  q = b(); addBox(q,0,0,0,4,2,2); addBox(q,0,2,0,2,2,3); addBox(q,2,2,0,2,2,1); p(q); 
+  q = b(); addBox(q,0,0,0,4,4,1); addBox(q,0,0,1,4,4,1); for(let x=1;x<3;x++) for(let y=1;y<3;y++) q = q.filter(c => !(c.x===x && c.y===y && c.z===1)); p(q); 
+  q = b(); addBox(q,0,0,0,4,4,3); for(let x=2;x<4;x++) for(let y=2;y<4;y++) for(let z=1;z<3;z++) q = q.filter(c => !(c.x===x && c.y===y && c.z===z)); p(q); 
+
+  return a.map((cells,i)=>({
+    name: [
+      'Küp', 'Dikdörtgen Prizma', 'Kare Plaka', 'Dikey Prizma', 'Uzun Prizma', 'Geniş Blok', 'İnce Sütun',
+      'Basamaklı Blok', 'L Blok', 'T Blok', 'Köprü (U Blok)', 'Kanallı Blok', 'Çıkıntılı Blok', 'Çift Basamak',
+      'Çapraz Kademeli', 'Kademeli Blok', 'Kanallı Blok 2', 'Kutu Çıkıntılı Blok', 'Birleşik Köşe Blok', 'Pencereli Blok', 'Köşe Çentikli Blok'
+    ][i],
+    level: i<7 ? 'Başlangıç' : i<14 ? 'Kolay' : 'Orta',
+    cells
+  }));
+}
+
+models = makeModels();
+
+function initViewer(elementId, which){
+  const el = document.getElementById(elementId);
+  const r = new THREE.WebGLRenderer({antialias:true});
+  r.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  r.setSize(el.clientWidth, el.clientHeight);
+  el.innerHTML = ''; 
+  el.appendChild(r.domElement);
+
+  const s = new THREE.Scene();
+  s.background = new THREE.Color('#e7edf5');
+
+  const c = new THREE.PerspectiveCamera(38, el.clientWidth/el.clientHeight, 0.1, 1000);
+  c.position.set(10,10,12);
+  c.lookAt(0,0,0);
+
+  s.add(new THREE.HemisphereLight(0xffffff, 0x475569, 2.2));
+  const light = new THREE.DirectionalLight(0xffffff, 1.8);
+  light.position.set(8,12,8);
+  s.add(light);
+
+  const g = new THREE.Group();
+  s.add(g);
+
+  const grid = new THREE.GridHelper(30, 30, 0x94a3b8, 0xcbd5e1);
+  grid.position.y = -0.51;
+  s.add(grid);
+
+  if(which === 'main') { renderer=r; scene=s; camera=c; group=g; }
+  if(which === 'builder') { customRenderer=r; customScene=s; customCamera=c; customGroup=g; }
+  if(which === 'quiz') { quizRenderer=r; quizScene=s; quizCamera=c; quizGroup=g; }
+
+  animate(which);
+}
+
+function animate(which){
+  const r = which==='main'?renderer:which==='builder'?customRenderer:quizRenderer;
+  const s = which==='main'?scene:which==='builder'?customScene:quizScene;
+  const c = which==='main'?camera:which==='builder'?customCamera:quizCamera;
+  if(r && s && c) r.render(s, c);
+  requestAnimationFrame(() => animate(which));
+}
+
+function setCameraView(viewType){
+  if(!models[current] || !models[current].cells) return;
+  const cells = models[current].cells;
+
+  const minX = Math.min(...cells.map(v=>v.x));
+  const maxX = Math.max(...cells.map(v=>v.x));
+  const minY = Math.min(...cells.map(v=>v.y));
+  const maxY = Math.max(...cells.map(v=>v.y));
+  const minZ = Math.min(...cells.map(v=>v.z));
+  const maxZ = Math.max(...cells.map(v=>v.z));
+
+  group.rotation.set(0,0,0);
+  group.position.set(-(minX+maxX)/2, -minZ, -(minY+maxY)/2);
+
+  const width = maxX - minX + 1;
+  const depth = maxY - minY + 1;
+  const height = maxZ - minZ + 1;
+  const largest = Math.max(width, depth, height);
+  const distance = largest * 2.5 + 4;
+  const targetY = height / 2;
+
+  camera.up.set(0,1,0);
+
+  if(viewType === 'iso'){
+    camera.position.set(distance*0.7, targetY + distance*0.6, distance*0.7);
+    camera.lookAt(0, targetY, 0);
+  } else {
+    if(viewType === 'front'){
+      camera.position.set(0, targetY, distance);
+      camera.lookAt(0, targetY, 0);
+    } else if(viewType === 'top'){
+      camera.up.set(0, 0, -1);
+      camera.position.set(0, targetY + distance, 0);
+      camera.lookAt(0, targetY, 0);
+    } else if(viewType === 'side'){
+      camera.position.set(distance, targetY, 0);
+      camera.lookAt(0, targetY, 0);
+    }
+  }
+}
+
+const boxGeo = new THREE.BoxGeometry(0.99, 0.99, 0.99);
+const edgesGeo = new THREE.EdgesGeometry(boxGeo);
+const lineMat = new THREE.LineBasicMaterial({ color: 0x0f172a, linewidth: 2 });
+
+function draw3D(g, cells, cam, forceGray = false){
+  while(g.children.length) {
+    g.remove(g.children[0]);
+  }
+
+  if(!cells || !cells.length){
+    g.position.set(0,0,0);
+    return;
+  }
+
+  const mats = {};
+
+  cells.forEach(v => {
+    let col = forceGray ? defaultGray : (v.color || defaultGray);
+    if(!mats[col]){
+      mats[col] = new THREE.MeshStandardMaterial({ color: col, roughness: 0.5 });
+    }
+    const m = new THREE.Mesh(boxGeo, mats[col]);
+    m.position.set(v.x, v.z, v.y);
+    
+    const line = new THREE.LineSegments(edgesGeo, lineMat);
+    m.add(line);
+
+    g.add(m);
+  });
+
+  if(cam === camera) {
+    setCameraView('iso');
+  } else if(cam && cells) {
+    const minX = Math.min(...cells.map(v=>v.x));
+    const maxX = Math.max(...cells.map(v=>v.x));
+    const minY = Math.min(...cells.map(v=>v.y));
+    const maxY = Math.max(...cells.map(v=>v.y));
+    const minZ = Math.min(...cells.map(v=>v.z));
+    const maxZ = Math.max(...cells.map(v=>v.z));
+    g.position.set(-(minX+maxX)/2, -minZ, -(minY+maxY)/2);
+    const width = maxX - minX + 1;
+    const depth = maxY - minY + 1;
+    const height = maxZ - minZ + 1;
+    const largest = Math.max(width, depth, height);
+    const distance = largest * 2.2 + 3;
+    const targetY = height / 2;
+    cam.position.set(distance*0.7, targetY + distance*0.6, distance*0.7);
+    cam.lookAt(0, targetY, 0);
+  }
+}
+
+function resizeAll(){
+  const list = [
+    ['viewer', renderer, camera],
+    ['builderViewer', customRenderer, customCamera],
+    ['quizViewer', quizRenderer, quizCamera]
+  ];
+  list.forEach(([elId, r, c]) => {
+    if(!r || !c) return;
+    const e = document.getElementById(elId);
+    if(e && e.clientWidth > 0){
+      r.setSize(e.clientWidth, e.clientHeight);
+      c.aspect = e.clientWidth / e.clientHeight;
+      c.updateProjectionMatrix();
+    }
+  });
+}
+window.addEventListener('resize', resizeAll);
+
+initViewer('viewer','main');
+initViewer('builderViewer','builder');
+initViewer('quizViewer','quiz');
+
+function drawProjection(canvas, cells, type, forceGray = false){
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width, h = canvas.height;
+  ctx.clearRect(0,0,w,h);
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0,0,w,h);
+
+  if(!cells || !cells.length) return;
+
+  let rawBlocks = cells.map(v => {
+    let pX, pY, depth;
+    if (type === 'front') {
+      pX = v.x; pY = v.z; depth = -v.y;
+    } else if (type === 'top') {
+      pX = v.x; pY = v.y; depth = v.z;
+    } else { // side
+      pX = v.y; pY = v.z; depth = -v.x;
+    }
+    return { x: pX, y: pY, depth, color: forceGray ? defaultGray : (v.color || defaultGray) };
+  });
+
+  let minX = Math.min(...rawBlocks.map(p => p.x));
+  let maxX = Math.max(...rawBlocks.map(p => p.x));
+  let minY = Math.min(...rawBlocks.map(p => p.y));
+  let maxY = Math.max(...rawBlocks.map(p => p.y));
+
+  let countX = maxX - minX + 1;
+  let countY = maxY - minY + 1;
+
+  let size = Math.min((w - 40) / countX, (h - 40) / countY, 36);
+  let ox = (w - countX * size) / 2;
+  let oy = (h - countY * size) / 2;
+
+  rawBlocks.sort((a, b) => a.depth - b.depth);
+
+  let gridMap = {};
+  rawBlocks.forEach(b => {
+    let rx = b.x - minX;
+    let ry = b.y - minY;
+    gridMap[rx + ',' + ry] = b;
+  });
+
+  let gap = 0.8;
+
+  for(let ry = 0; ry < countY; ry++){
+    for(let rx = 0; rx < countX; rx++){
+      let key = rx + ',' + ry;
+      if(gridMap[key]){
+        let x = ox + rx * size + gap / 2;
+        let y = h - oy - (ry + 1) * size + gap / 2;
+        let drawSize = size - gap;
+
+        ctx.fillStyle = gridMap[key].color;
+        ctx.fillRect(x, y, drawSize, drawSize);
+
+        ctx.strokeStyle = '#0f172a';
+        ctx.lineWidth = 1.8;
+        ctx.strokeRect(x, y, drawSize, drawSize);
+      }
+    }
+  }
+}
+
+function updateViews(cells){
+  drawProjection(document.getElementById('frontCanvas'), cells, 'front');
+  drawProjection(document.getElementById('topCanvas'), cells, 'top');
+  drawProjection(document.getElementById('sideCanvas'), cells, 'side');
+}
+
+function populateSelect(list){
+  const s = document.getElementById('modelSelect');
+  s.innerHTML = '';
+  list.forEach(m => {
+    let o = document.createElement('option');
+    o.value = models.indexOf(m);
+    o.textContent = m.name;
+    s.appendChild(o);
+  });
+}
+
+window.filterModels = function(){
+  let level = document.getElementById('level').value;
+  let list = models.filter(m => level === 'all' || m.level === level);
+  populateSelect(list);
+  if(list.length) window.selectModel(models.indexOf(list[0]));
+};
+
+window.selectModel = function(i){
+  if(i < 0 || !models[i]) return;
+  current = i;
+  let m = models[i];
+
+  document.getElementById('modelSelect').value = i;
+  document.getElementById('modelTitle').textContent = m.name;
+  document.getElementById('modelInfo').textContent = 'Seviye: ' + m.level + ' • Blok sayısı: ' + m.cells.length;
+
+  draw3D(group, m.cells, camera, false);
+  updateViews(m.cells);
+};
+
+window.nextModel = function(){
+  window.selectModel((current + 1) % models.length);
+};
+
+window.setCameraView = setCameraView;
+
+function enableDrag(element, g){
+  let dragging = false, lastX = 0, lastY = 0;
+  element.addEventListener('pointerdown', e => {
+    dragging = true; lastX = e.clientX; lastY = e.clientY;
+    element.setPointerCapture(e.pointerId);
+  });
+  element.addEventListener('pointermove', e => {
+    if(!dragging) return;
+    const dx = e.clientX - lastX;
+    const dy = e.clientY - lastY;
+    g.rotation.y += dx * 0.01;
+    g.rotation.x += dy * 0.01;
+    lastX = e.clientX; lastY = e.clientY;
+  });
+  element.addEventListener('pointerup', () => dragging = false);
+  element.addEventListener('pointercancel', () => dragging = false);
+}
+
+enableDrag(document.getElementById('viewer'), group);
+enableDrag(document.getElementById('builderViewer'), customGroup);
+enableDrag(document.getElementById('quizViewer'), quizGroup);
+
+const colorsEl = document.getElementById('palette');
+builderColors.forEach((c, index) => {
+  let s = document.createElement('button');
+  s.className = 'swatch' + (index === 0 ? ' selected' : '');
+  s.style.background = c;
+  s.onclick = () => {
+    selectedColor = c;
+    document.querySelectorAll('.swatch').forEach(x => x.classList.remove('selected'));
+    s.classList.add('selected');
+  };
+  colorsEl.appendChild(s);
+});
+
+window.drawGrid = function(){
+  const grid = document.getElementById('builderGrid');
+  grid.innerHTML = '';
+  let z = +document.getElementById('layerSelect').value;
+
+  for(let i=0; i<36; i++){
+    let d = document.createElement('button');
+    d.className = 'cell';
+    if(layers[z][i]) d.style.background = layers[z][i].color;
+
+    d.onclick = () => {
+      layers[z][i] = editMode === 'add' ? {color: selectedColor} : null;
+      window.drawGrid();
+      refreshCustom();
+    };
+    grid.appendChild(d);
+  }
+};
+
+window.setEditMode = function(mode){
+  editMode = mode;
+  document.getElementById('addMode').className = mode === 'add' ? 'active' : 'secondary';
+  document.getElementById('removeMode').className = mode === 'remove' ? 'active' : 'secondary';
+};
+
+function customCells(){
+  let a = [];
+  layers.forEach((layer, z) => layer.forEach((c, i) => {
+    if(c) a.push({x: i % 6, y: Math.floor(i / 6), z, color: c.color});
+  }));
+  return a;
+}
+
+function refreshCustom(){
+  draw3D(customGroup, customCells(), customCamera, false);
+}
+
+window.clearLayer = function(){
+  layers[+document.getElementById('layerSelect').value].fill(null);
+  window.drawGrid(); 
+  refreshCustom();
+};
+
+window.clearAll = function(){
+  layers.forEach(l => l.fill(null));
+  window.drawGrid(); 
+  refreshCustom();
+};
+
+window.showCustomViews = function(){
+  if(!customCells().length){
+    alert('Model henüz boş!');
+    return;
+  }
+  updateViews(customCells());
+  alert('Görünüşler başarıyla oluşturuldu.');
+};
+
+window.useCustomModel = function(){
+  if(!customCells().length){
+    alert('Önce modeline blok eklemelisin.');
+    return;
+  }
+  quizTarget = {name: 'Senin Tasarımın', cells: customCells()};
+  window.showTab('quiz');
+  loadQuizTarget();
+};
+
+window.showTab = function(t){
+  ['models','builder','quiz'].forEach(id => {
+    document.getElementById(id).style.display = id === t ? 'block' : 'none';
+  });
+  ['Models','Builder','Quiz'].forEach((id, i) => {
+    document.getElementById('tab'+id).classList.toggle('active', ['models','builder','quiz'][i] === t);
+  });
+  setTimeout(resizeAll, 50);
+};
+
+function loadQuizTarget(){
+  if(!quizTarget) quizTarget = models[Math.floor(Math.random()*models.length)];
+
+  draw3D(quizGroup, quizTarget.cells, quizCamera, true);
+
+  const q = document.getElementById('quizQuestions');
+  q.innerHTML = '';
+
+  ['front','top','side'].forEach((type, index) => {
+    let distractors = models.filter(m => m.name !== quizTarget.name)
+      .sort(() => Math.random() - 0.5).slice(0, 2);
+
+    let options = [
+      {cells: quizTarget.cells, correct: true},
+      ...distractors.map(m => ({cells: m.cells, correct: false}))
+    ].sort(() => Math.random() - 0.5);
+
+    let row = document.createElement('div');
+    row.className = 'panel';
+    row.innerHTML = '<h3>' + ['Ön görünüşü seç','Üst görünüşü seç','Yan görünüşü seç'][index] + '</h3>';
+
+    let choices = document.createElement('div');
+    choices.className = 'quizrow';
+
+    options.forEach((op, j) => {
+      let btn = document.createElement('button');
+      btn.className = 'option';
+
+      let canvas = document.createElement('canvas');
+      canvas.width = 240; 
+      canvas.height = 140;
+      drawProjection(canvas, op.cells, type, true);
+
+      let label = document.createElement('div');
+      label.style.marginTop = '6px';
+      label.textContent = String.fromCharCode(65 + j) + ' Seçeneği';
+
+      btn.append(canvas, label);
+      btn.dataset.correct = op.correct ? '1' : '0';
+
+      btn.onclick = () => {
+        choices.querySelectorAll('.option').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+      };
+
+      choices.appendChild(btn);
+    });
+
+    row.appendChild(choices);
+    q.appendChild(row);
+  });
+
+  document.getElementById('quizFeedback').textContent = '';
+};
+
+window.newQuiz = function(){
+  quizTarget = models[Math.floor(Math.random()*models.length)];
+  loadQuizTarget();
+};
+
+window.checkQuiz = function(){
+  let rows = document.getElementById('quizQuestions').children;
+  let score = 0;
+
+  Array.from(rows).forEach(row => {
+    let chosen = row.querySelector('.option.selected');
+    row.querySelectorAll('.option').forEach(b => {
+      b.style.borderColor = b.dataset.correct === '1' ? '#16a34a' : '#cbd5e1';
+    });
+    if(chosen && chosen.dataset.correct === '1') score++;
+  });
+
+  let f = document.getElementById('quizFeedback');
+  f.textContent = 'Sonuç: 3 sorudan ' + score + ' doğru cevap. ' +
+    (score === 3 ? 'Harika! Bütün görünüşleri doğru buldun.' : 'Tekrar incele ve yeniden dene.');
+  f.style.color = score === 3 ? '#15803d' : '#b45309';
+};
+
+// Başlangıç İşlemleri
+populateSelect(models);
+window.selectModel(0);
+window.drawGrid();
+refreshCustom();
+loadQuizTarget();
+</script>
+</body>
+</html>
